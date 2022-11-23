@@ -6,7 +6,14 @@ import org.mockito.Captor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import ru.research.shop.config.KafkaConsumerConfig;
 import ru.research.shop.config.KafkaProducerConfig;
 import ru.research.shop.service.UserKafkaConsumer;
@@ -23,8 +30,18 @@ import static org.mockito.Mockito.verify;
         KafkaConsumerConfig.class,
         UserKafkaConsumer.class
 })
+@Testcontainers
 @TestPropertySource("classpath:application-test.properties")
-public class KafkaTest {
+@DirtiesContext
+public class WithTestcontainersKafkaInstanceTest {
+
+    @Container
+    static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:latest"));
+
+    @DynamicPropertySource
+    static void kafkaProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+    }
 
     @Autowired
     private UserKafkaProducer producer;
@@ -47,9 +64,6 @@ public class KafkaTest {
     @Test
     void t() {
         System.out.println("---start---");
-        var t = new Date().getTime();
-        System.out.println(t);
-        producer.writeToKafka("user" + t);
 
         var t1 = new Date().getTime();
         System.out.println(t1);
@@ -59,12 +73,14 @@ public class KafkaTest {
         System.out.println(t2);
         producer.writeToKafka("user" + t2);
 
+        var t3 = new Date().getTime();
+        System.out.println(t3);
+        producer.writeToKafka("user" + t3);
+
         verify(consumer, timeout(5000).times(3))
                 .receiveCustomerEvent(userArgumentCaptor.capture(), topicArgumentCaptor.capture(),
                         partitionArgumentCaptor.capture(), offsetArgumentCaptor.capture());
 
         System.out.println("---stop---");
     }
-
 }
-
